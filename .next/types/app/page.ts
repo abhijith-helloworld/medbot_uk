@@ -1,4 +1,4 @@
-// File: C:\Users\Abhi\Documents\ihub-robotics\uk_med_bot\app\page.tsx
+// File: C:\Users\Abhi\Documents\medbot_uk\app\page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
