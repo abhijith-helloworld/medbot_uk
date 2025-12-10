@@ -36,17 +36,30 @@ import {
 } from "./nurseOverview/hooks/useAlerts";
 
 type Alert = {
-  id: string;
+  id: number;
   room: string;
   bed: string;
   reason?: string;
   created_at: string;
+  is_timed_out?: boolean;
+  is_help?: boolean;
+  is_cancelled?: boolean;
+  not_me?: boolean;
+  is_patient_pop?: boolean;
+};
+
+type FailedSchedule = {
+  id: number;
+  reason?: string;
+  room_name: string;
+  bed_name: string;
+  created_at: string;
+  responded: boolean;
 };
 
 export function NurseOverview({ title }: { title: string }) {
-  const { data: alerts, isLoading, isError } = useAlerts();
-  const { data: telemetry, isLoading: isTelemetryLoading } =
-    useRobotTelemetry();
+  const { data: alerts } = useAlerts();
+  const { data: telemetry } = useRobotTelemetry();
   const respondToAlertMutation = useRespondToAlert();
 
   const { data: failedSchedules, isLoading: isLoadingSchedules } =
@@ -114,23 +127,27 @@ export function NurseOverview({ title }: { title: string }) {
     failedSchedules?.filter((schedule) => !schedule.responded) || [];
 
   return (
-    <div className="mx-auto space-y-6 px-4 md:px-6 lg:px-10 py-4">
+    <div className="w-full mx-auto space-y-4 sm:space-y-6 px-3 sm:px-4 md:px-6 lg:px-10 py-3 sm:py-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          {title}
+        </h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Your patients and tasks for today
         </p>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Robot</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Robot
+            </CardTitle>
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold truncate">
               {telemetry?.robot_name || "Unknown"}
             </div>
             <p className="text-xs text-muted-foreground">Assigned to you</p>
@@ -138,12 +155,14 @@ export function NurseOverview({ title }: { title: string }) {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Battery</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Battery
+            </CardTitle>
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold">
               {telemetry?.robot_battery || 0}%
             </div>
             <p className="text-xs text-muted-foreground">Current battery</p>
@@ -151,35 +170,39 @@ export function NurseOverview({ title }: { title: string }) {
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alerts</CardTitle>
-            <Bell className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Alerts
+            </CardTitle>
+            <Bell className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{alerts?.length || 0}</div>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold">
+              {alerts?.length || 0}
+            </div>
             <p className="text-xs text-muted-foreground">Requires attention</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+        <Card className="col-span-2 lg:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">
               Latest position
             </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-lg sm:text-2xl font-bold capitalize truncate">
               {telemetry?.latest_room_reached || "Unknown"}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground capitalize">
               Bed: {telemetry?.latest_bed_reached || "Unknown"}
             </p>
             {telemetry?.robot_door_opening && (
               <div className="mt-2 flex items-center">
                 <Badge
                   variant="outline"
-                  className="border-blue-500 text-blue-500 flex items-center gap-1"
+                  className="border-blue-500 text-blue-500 flex items-center gap-1 text-xs"
                 >
                   <DoorOpen className="h-3 w-3" />
                   Door Opening
@@ -190,7 +213,7 @@ export function NurseOverview({ title }: { title: string }) {
               <div className="mt-2 flex items-center">
                 <Badge
                   variant="outline"
-                  className="border-red-500 text-red-500 flex items-center gap-1"
+                  className="border-red-500 text-red-500 flex items-center gap-1 text-xs"
                 >
                   <DoorOpen className="h-3 w-3" />
                   Door closing
@@ -202,34 +225,34 @@ export function NurseOverview({ title }: { title: string }) {
       </div>
 
       {/* Quick Actions & Urgent Items */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         {/* Urgent Alerts Section */}
         <Card>
-          <CardHeader>
-            <CardTitle>Urgent Alerts</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">Urgent Alerts</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Patients requiring immediate attention
             </CardDescription>
           </CardHeader>
           <CardContent
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="space-y-4 max-h-[350px] overflow-y-auto pr-3"
+            className="space-y-3 sm:space-y-4 max-h-[300px] sm:max-h-[350px] overflow-y-auto pr-2 sm:pr-3 p-4 pt-0 sm:p-6 sm:pt-0"
           >
-            {Object.entries(groupedAlerts).map(([groupName, alerts]) =>
-              alerts.length > 0 ? (
+            {Object.entries(groupedAlerts).map(([groupName, alertsList]) =>
+              alertsList.length > 0 ? (
                 <div key={groupName}>
-                  <h3 className="text-md font-semibold mb-2 capitalize">
+                  <h3 className="text-sm sm:text-md font-semibold mb-2 capitalize">
                     {groupName.replace(/([A-Z])/g, " $1")}
                   </h3>
-                  {alerts.slice(0, visibleAlertsCount).map((alert) => (
+                  {alertsList.slice(0, visibleAlertsCount).map((alert) => (
                     <div
                       key={alert.id}
-                      className="flex items-center justify-between p-3 border rounded-lg"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg gap-3 mb-2"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div
-                          className={`w-3 h-3 rounded-full ${
+                          className={`w-3 h-3 rounded-full flex-shrink-0 mt-1 ${
                             groupName === "timedOut"
                               ? "bg-yellow-500"
                               : groupName === "help"
@@ -243,16 +266,18 @@ export function NurseOverview({ title }: { title: string }) {
                               : "bg-green-500"
                           }`}
                         />
-                        <div>
-                          <p className="font-medium">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm break-words">
                             Room: {alert.room} • Bed: {alert.bed}
                           </p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs sm:text-sm text-muted-foreground break-words">
                             {alert.reason || "No reason provided yet"}
                           </p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Clock className="w-3 h-3" />
-                            {new Date(alert.created_at).toLocaleString()}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                            <Clock className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">
+                              {new Date(alert.created_at).toLocaleString()}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -260,6 +285,7 @@ export function NurseOverview({ title }: { title: string }) {
                       <Button
                         size="sm"
                         variant="default"
+                        className="w-full sm:w-auto flex-shrink-0"
                         onClick={() => {
                           setSelectedAlert(alert);
                           setResponseReason("");
@@ -273,62 +299,72 @@ export function NurseOverview({ title }: { title: string }) {
                 </div>
               ) : null
             )}
+            {sortedAlerts.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No alerts at this time.
+              </p>
+            )}
           </CardContent>
         </Card>
 
         {/* Failed Schedules Section */}
         <Card>
-          <CardHeader>
-            <CardTitle>Failed Schedules</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">
+              Failed Schedules
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Schedules that require manual confirmation
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 max-h-[350px] overflow-y-auto pr-3">
-            {isLoadingSchedules && <p>Loading schedules...</p>}
+          <CardContent className="space-y-3 sm:space-y-4 max-h-[300px] sm:max-h-[350px] overflow-y-auto pr-2 sm:pr-3 p-4 pt-0 sm:p-6 sm:pt-0">
+            {isLoadingSchedules && (
+              <p className="text-sm text-center py-4">Loading schedules...</p>
+            )}
             {!isLoadingSchedules && unrespondedSchedules.length === 0 && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground text-center py-4">
                 No failed schedules to review.
               </p>
             )}
-            {unrespondedSchedules.map((schedule) => {
-              // --- START OF FIX ---
+            {unrespondedSchedules.map((schedule: FailedSchedule) => {
               const isUpdatingThisSchedule =
                 respondToScheduleMutation.isPending &&
-                respondToScheduleMutation.variables === schedule.id;
-              // --- END OF FIX ---
+                String(respondToScheduleMutation.variables) === String(schedule.id);
 
               return (
                 <div
                   key={schedule.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg gap-3"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                      <ClipboardCheck className="w-5 h-5 text-blue-500" />
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <ClipboardCheck className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
                     </div>
-                    <div>
-                      <p className="font-medium">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm break-words">
                         {schedule.reason || "Reason not specified"}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <MapPin className="w-3 h-3" />
-                        {schedule.room_name} • {schedule.bed_name}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <MapPin className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">
+                          {schedule.room_name} • {schedule.bed_name}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                        <Clock className="w-3 h-3" />
-                        {new Date(schedule.created_at).toLocaleString()}
+                        <Clock className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">
+                          {new Date(schedule.created_at).toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   </div>
                   <Button
                     size="sm"
                     variant="secondary"
+                    className="w-full sm:w-auto flex-shrink-0"
                     onClick={() =>
                       respondToScheduleMutation.mutate(schedule.id)
                     }
-                    // Disable all buttons if any mutation is running,
-                    // but only the clicked one will show the loading text.
                     disabled={respondToScheduleMutation.isPending}
                   >
                     {isUpdatingThisSchedule ? "Updating..." : "Acknowledge"}
@@ -342,7 +378,7 @@ export function NurseOverview({ title }: { title: string }) {
 
       {/* Modal for Responding */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md mx-4">
           <DialogHeader>
             <DialogTitle>Respond to Alert</DialogTitle>
           </DialogHeader>
@@ -358,8 +394,12 @@ export function NurseOverview({ title }: { title: string }) {
               onChange={(e) => setResponseReason(e.target.value)}
             />
           </div>
-          <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsModalOpen(false)}
+              className="w-full sm:w-auto"
+            >
               Cancel
             </Button>
             <Button
@@ -367,6 +407,7 @@ export function NurseOverview({ title }: { title: string }) {
               disabled={
                 respondToAlertMutation.isPending || !responseReason.trim()
               }
+              className="w-full sm:w-auto"
             >
               {respondToAlertMutation.isPending ? "Updating..." : "Submit"}
             </Button>

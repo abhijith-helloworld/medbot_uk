@@ -1,7 +1,7 @@
 // components/RobotStatus.tsx
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, JSX } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
@@ -190,7 +190,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
           </div>
 
           <div className="space-y-3">
-            <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+            <h3 className="font-medium text-sm text-muted-foreground tracking-wide capitalize">
               {title}
             </h3>
 
@@ -201,7 +201,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
                 <span className="text-2xl font-bold text-foreground">{value}</span>
 
                 {subtitle && typeof subtitle === "string" && (
-                  <span className="text-sm text-muted-foreground">{subtitle}</span>
+                  <span className="text-sm text-muted-foreground capitalize">{subtitle}</span>
                 )}
                 {subtitle && typeof subtitle !== "string" && subtitle}
               </div>
@@ -478,54 +478,86 @@ export function RobotStatus(): JSX.Element {
   };
 
   return (
-    <div className="bg-muted/20 px-4 md:px-0 lg:px-8 py-6">
-      <div className="mx-auto space-y-6 ">
-        <h1 className="text-3xl font-bold text-foreground">Robot Dashboard</h1>
-        <p className="text-base text-muted-foreground mt-2">Real-time monitoring & intelligent control</p>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <MetricCard
-            icon={Bot}
-            title="Robot Name"
-            value={telemetry?.robot_name || "—"}
-            color="blue"
-            isLoading={telemetryLoading}
-            subtitle=""
-            progress={null}
-            alert={null}
-          />
-
-          <MetricCard
-            icon={Battery}
-            title="Battery Level"
-            value={`${telemetry?.robot_battery ?? 0}%`}
-            progress={telemetry?.robot_battery ?? 0}
-            color={getBatteryColor(telemetry?.robot_battery)}
-            isLoading={telemetryLoading}
-            subtitle=""
-            alert={null}
-          />
-
-          <MetricCard
-            icon={MapPin}
-            title="Location"
-            value={telemetry?.latest_room_reached || "Unknown"}
-            color="purple"
-            isLoading={telemetryLoading}
-            subtitle=""
-            progress={null}
-            alert={null}
-          />
-        </div>
-
-        <ArmStatusCard status={armStatus} isLoading={armStatusLoading} />
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <JointDataCard title="Joint Position" data={position} icon={Activity} color="green" description="Current joint angles" isLoading={positionLoading} />
-          <JointDataCard title="Joint Effort" data={effort} icon={Zap} color="orange" description="Applied torque/force" isLoading={effortLoading} />
-          <JointDataCard title="Joint Temperature" data={heat} icon={Thermometer} color="orange" description="Live joint temperatures" isLoading={heatLoading} />
-        </div>
-      </div>
+<div className="bg-muted/20 px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 capitalize">
+  <div className="w-full mx-auto space-y-4 sm:space-y-6">
+    <div className="space-y-2">
+      <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+        Robot Dashboard
+      </h1>
+      <p className="text-sm sm:text-base text-muted-foreground">
+        Real-time monitoring & intelligent control
+      </p>
     </div>
+
+    {/* Metric Cards Grid */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+      <MetricCard
+        icon={Bot}
+        title="Robot Name"
+        value={telemetry?.robot_name || "—"}
+        color="blue"
+        isLoading={telemetryLoading}
+        subtitle=""
+        progress={null}
+        alert={null}
+      />
+
+      <MetricCard
+        icon={Battery}
+        title="Battery Level"
+        value={`${telemetry?.robot_battery ?? 0}%`}
+        progress={telemetry?.robot_battery ?? 0}
+        color={getBatteryColor(telemetry?.robot_battery)}
+        isLoading={telemetryLoading}
+        subtitle=""
+        alert={null}
+      />
+
+      <MetricCard
+        icon={MapPin}
+        title="Location"
+        value={telemetry?.latest_room_reached || "Unknown"}
+        color="purple"
+        isLoading={telemetryLoading}
+        subtitle=""
+        progress={null}
+        alert={null}
+        // className="sm:col-span-2 lg:col-span-1 capitalize"
+      />
+    </div>
+
+    {/* Arm Status Card */}
+    <ArmStatusCard status={armStatus} isLoading={armStatusLoading} />
+
+    {/* Joint Data Cards Grid */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+      <JointDataCard
+        title="Joint Position"
+        data={position}
+        icon={Activity}
+        color="green"
+        description="Current joint angles"
+        isLoading={positionLoading}
+      />
+      <JointDataCard
+        title="Joint Effort"
+        data={effort}
+        icon={Zap}
+        color="orange"
+        description="Applied torque/force"
+        isLoading={effortLoading}
+      />
+      <JointDataCard
+        title="Joint Temperature"
+        data={heat}
+        icon={Thermometer}
+        color="orange"
+        description="Live joint temperatures"
+        isLoading={heatLoading}
+        // className="md:col-span-2 lg:col-span-1"
+      />
+    </div>
+  </div>
+</div>
   );
 }
