@@ -237,7 +237,7 @@ export function NurseOverview({ title }: { title: string }) {
           <CardContent
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="space-y-3 sm:space-y-4 max-h-[300px] sm:max-h-[350px] overflow-y-auto pr-2 sm:pr-3 p-4 pt-0 sm:p-6 sm:pt-0"
+            className="space-y-3 sm:space-y-4 max-h-[300px] sm:max-h-[350px] overflow-y-auto pr-2 sm:pr-3 p-4 pt-0 sm:p-6 sm:pt-0 no-scrollbar"
           >
             {Object.entries(groupedAlerts).map(([groupName, alertsList]) =>
               alertsList.length > 0 ? (
@@ -248,7 +248,7 @@ export function NurseOverview({ title }: { title: string }) {
                   {alertsList.slice(0, visibleAlertsCount).map((alert) => (
                     <div
                       key={alert.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg gap-3 mb-2"
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg gap-3 mb-2 "
                     >
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div

@@ -495,7 +495,7 @@ export function RobotStatus(): JSX.Element {
         icon={Bot}
         title="Robot Name"
         value={telemetry?.robot_name || "—"}
-        color="blue"
+        color="purple"
         isLoading={telemetryLoading}
         subtitle=""
         progress={null}

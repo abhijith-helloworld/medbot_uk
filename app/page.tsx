@@ -1,37 +1,31 @@
 "use client";
-import React from "react";
+
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminDashboard } from "@/features/admin/admin-dashboard";
 import { NurseDashboard } from "@/features/nurse/nurse-dashboard";
+import { DashboardLoader } from "../components/dasboardloading";
 
 export default function Home() {
   const { user, logout, loading } = useAuth();
   const router = useRouter();
 
+  // Redirect if no user AFTER loading
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
     }
   }, [user, router, loading]);
 
-  if (!user) {
-    return (
-      <div className="flex w-full items-center justify-center h-screen">
-        <div className="flex flex-row gap-2">
-          <div className="w-4 h-4 rounded-full bg-pink-400 animate-bounce"></div>
-          <div
-            className="w-4 h-4 rounded-full bg-pink-400 animate-bounce"
-            style={{ animationDelay: "-0.3s" }}
-          ></div>
-          <div
-            className="w-4 h-4 rounded-full bg-pink-400 animate-bounce"
-            style={{ animationDelay: "-0.5s" }}
-          ></div>
-        </div>
-      </div>
-    );
+  // Let Next.js show app/loading.tsx (user loading)
+  if (loading) return null;
+
+  if (!user) return null;
+
+  // Dashboard data loading state (you can improve later)
+  if (!user.role) {
+    return <DashboardLoader />;
   }
 
   return user.role === "admin" ? (

@@ -133,7 +133,7 @@ export default function Scheduler() {
                 key={scheduler.id}
                 className="hover:shadow-lg transition-shadow duration-300 rounded-xl overflow-hidden flex flex-col justify-between"
               >
-                <CardHeader className="bg-purple-50 p-4">
+                <CardHeader className="p-4">
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-xl font-semibold text-purple-800">
                       {scheduler.batch_name}
