@@ -187,7 +187,7 @@ export function NurseManagement() {
   const isSubmitting = isCreating || isUpdating
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header + Add Nurse Button */}
       <div className="flex items-center justify-between">
         <div>

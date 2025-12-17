@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminDashboard } from "@/features/admin/admin-dashboard";
 import { NurseDashboard } from "@/features/nurse/nurse-dashboard";
@@ -18,19 +19,29 @@ export default function Home() {
     }
   }, [user, router, loading]);
 
-  // Let Next.js show app/loading.tsx (user loading)
+  // Let Next.js show app/loading.tsx
   if (loading) return null;
-
   if (!user) return null;
 
-  // Dashboard data loading state (you can improve later)
+  // Extra safety (role not ready)
   if (!user.role) {
     return <DashboardLoader />;
   }
 
-  return user.role === "admin" ? (
-    <AdminDashboard user={user} onLogout={logout} />
-  ) : (
-    <NurseDashboard user={user} onLogout={logout} />
+  return (
+    <>
+      {/* DASHBOARD */}
+      {user.role === "admin" ? (
+        <AdminDashboard user={user} onLogout={logout} />
+      ) : (
+        <NurseDashboard user={user} onLogout={logout} />
+      )}
+
+      {/* NOUPE CHATBOT */}
+      <Script
+        src="https://www.noupe.com/embed/019aecf5299c73689b7d59cc3e9b4469ad6b.js"
+        strategy="afterInteractive"
+      />
+    </>
   );
 }

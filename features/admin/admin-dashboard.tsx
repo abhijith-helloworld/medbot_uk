@@ -105,9 +105,9 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 }}
             />
             <SidebarInset className="flex flex-col h-screen overflow-hidden">
-                <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-white px-4 shadow-sm">
+                <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-white dark:bg-black px-4 shadow-sm">
                     <SidebarTrigger />
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium ">
                         <span className="text-lg text-muted-foreground">
                             Admin Dashboard
                         </span>

@@ -6,7 +6,7 @@ const liveBaseUrl = process.env.NEXT_PUBLIC_API_URL; // same for now
 export const appConfig = {
   baseUrl: server === "live" ? liveBaseUrl : demoBaseUrl,
 
-  webhookUrl: process.env.NEXT_PUBLIC_WEBHOOK_API_URL,
+  // webhookUrl: process.env.NEXT_PUBLIC_WEBHOOK_API_URL,
 
   ws: {
     help: process.env.NEXT_PUBLIC_WS_HELP_URL!,
