@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Script from "next/script";
+// import Script from "next/script";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminDashboard } from "@/features/admin/admin-dashboard";
 import { NurseDashboard } from "@/features/nurse/nurse-dashboard";
@@ -38,10 +38,10 @@ export default function Home() {
       )}
 
       {/* NOUPE CHATBOT */}
-      <Script
+      {/* <Script
         src="https://www.noupe.com/embed/019aecf5299c73689b7d59cc3e9b4469ad6b.js"
         strategy="afterInteractive"
-      />
+      /> */}
     </>
   );
 }
