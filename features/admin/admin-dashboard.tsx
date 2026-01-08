@@ -13,6 +13,8 @@ import { AlertCenter } from "@/components/alerts/components/alert-center";
 import { useAlert } from "@/components/alertContex/AlertContext";
 import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
 import { NurseOverview } from "@/components/Overview";
+import  Hand  from "@/app/robot/page";
+
 
 interface AdminDashboardProps {
     user: { role: string; name: string; email: string };
@@ -58,6 +60,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 return <InfrastructureManagement />;
             case "map":
                 return <MapManagement />;
+            case "hand":
+                return <Hand />;
             // case "alerts":
             //   return <AlertCenter />;
             default:
@@ -114,7 +118,11 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     </div>
                 </header>
 
-                <div className={`flex-1 overflow-y-auto ${activeView === 'robots' ? '' : ''}`}>
+                <div
+                    className={`flex-1 overflow-y-auto ${
+                        activeView === "robots" ? "" : ""
+                    }`}
+                >
                     {renderContent()}
                 </div>
             </SidebarInset>

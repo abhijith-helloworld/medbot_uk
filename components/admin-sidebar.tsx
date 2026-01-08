@@ -1,6 +1,6 @@
 "use client"
 
-import { Bot, LayoutDashboard, Users, UserIcon as UserNurse, LogOut, Activity, MapPin, Shield, Hospital, Settings } from "lucide-react"
+import { Bot, LayoutDashboard, Users, UserIcon as UserNurse, LogOut, Activity, MapPin, Shield, Hospital,Hand, Settings } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -29,6 +29,7 @@ const menuGroups = [
     title: "Dashboard",
     items: [
       { id: "overview", title: "Overview", icon: LayoutDashboard, description: "System analytics" },
+      { id: "hand", title: "Arm", icon: Hand, description: "Access controls" },
     ]
   },
   {
@@ -44,7 +45,6 @@ const menuGroups = [
     items: [
       { id: "management", title: "Infrastructure", icon: Hospital, description: "Facility setup" },
       { id: "map", title: "Map Layout", icon: MapPin, description: "Floor management" },
-      // { id: "security", title: "Security", icon: Shield, description: "Access controls" },
       // { id: "settings", title: "Settings", icon: Settings, description: "System configuration" },
     ]
   }

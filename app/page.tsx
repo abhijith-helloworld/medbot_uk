@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdminDashboard } from "@/features/admin/admin-dashboard";
 import { NurseDashboard } from "@/features/nurse/nurse-dashboard";
-import { DashboardLoader } from "../components/dasboardloading";
 
 export default function Home() {
   const { user, logout, loading } = useAuth();
@@ -23,10 +22,6 @@ export default function Home() {
   if (loading) return null;
   if (!user) return null;
 
-  // Extra safety (role not ready)
-  if (!user.role) {
-    return <DashboardLoader />;
-  }
 
   return (
     <>

@@ -11,5 +11,6 @@ export const appConfig = {
   ws: {
     help: process.env.NEXT_PUBLIC_WS_HELP_URL!,
     notification: process.env.NEXT_PUBLIC_WS_NOTIF_URL!,
+    arm: process.env.NEXT_PUBLIC_WS_ARM_MOMENT_URL!
   },
 };
