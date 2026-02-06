@@ -10,15 +10,20 @@ import {
     Rotate3D,
     Minus,
     Plus,
-    Wifi,
-    WifiOff,
     RefreshCw,
     Home,
 } from "lucide-react";
 
-/* ===================== Utils ===================== */
-const degToRad = (deg: number) => +((deg * Math.PI) / 180).toFixed(3);
+/* ===================== Types ===================== */
+interface JointUpdate {
+    type: string;
+    urdfJoints?: Record<string, number>;
+    joints?: Record<string, number>;
+    source?: string;
+    role?: string;
+}
 
+/* ===================== Utils ===================== */
 const clamp = (v: number, min: number, max: number) =>
     Math.max(min, Math.min(max, v));
 
@@ -28,6 +33,7 @@ export default function RobotArmView() {
     const [autoRotate, setAutoRotate] = useState(true);
     const [resetView, setResetView] = useState(false);
     const [wsConnected, setWsConnected] = useState(false);
+    const [isDark, setIsDark] = useState(false);
 
     const [joints, setJoints] = useState<Record<string, number>>(
         Object.fromEntries(Object.keys(urdfJoints).map((k) => [k, 0]))
@@ -35,31 +41,31 @@ export default function RobotArmView() {
 
     /* -------- Refs -------- */
     const wsRef = useRef<WebSocket | null>(null);
-    const pendingMessages = useRef<any[]>([]);
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
-    const isUpdatingFromServer = useRef(false);
+    const pendingMessages = useRef<JointUpdate[]>([]);
+    const sendTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+    const rafRef = useRef<Record<string, number>>({});
+    const isUserDragging = useRef(false);
+    const lastSentValue = useRef<Record<string, number>>({});
+    const isMounted = useRef(true);
 
-    const [isDark, setIsDark] = useState(false);
-
+    /* ===================== Dark Mode Detection ===================== */
     useEffect(() => {
         const checkDark = () => {
+            if (!isMounted.current) return;
             const isDarkMode = document.documentElement.classList.contains("dark");
             setIsDark(isDarkMode);
         };
 
-        // Initial check
         checkDark();
-        
-        // Listen for theme changes
+
         const observer = new MutationObserver(checkDark);
         observer.observe(document.documentElement, {
             attributes: true,
             attributeFilter: ["class"],
         });
 
-        // Also listen for custom event if you have one
         window.addEventListener("theme-change", checkDark);
-        
+
         return () => {
             observer.disconnect();
             window.removeEventListener("theme-change", checkDark);
@@ -67,35 +73,43 @@ export default function RobotArmView() {
     }, []);
 
     /* ===================== WebSocket ===================== */
-
     useEffect(() => {
+        isMounted.current = true;
         const ws = new WebSocket(appConfig.ws.arm);
         wsRef.current = ws;
 
         ws.onopen = () => {
+            if (!isMounted.current) return;
             console.log("✅ WS connected");
             setWsConnected(true);
 
-            pendingMessages.current.forEach((msg) =>
-                ws.send(JSON.stringify(msg))
-            );
+            // Send any pending messages
+            pendingMessages.current.forEach((msg) => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify(msg));
+                }
+            });
             pendingMessages.current = [];
         };
 
         ws.onmessage = (e) => {
+            if (!isMounted.current) return;
             try {
-                const message = JSON.parse(e.data);
-                console.log("📥 WS received (raw):", message);
+                const message: JointUpdate = JSON.parse(e.data);
+                console.log("📥 WS received:", message);
 
                 // Accept both 'urdfJoints' and 'joints' fields for compatibility
                 const data = message.urdfJoints || message.joints;
 
-                console.log("📥 Extracted data:", data);
-                console.log("📥 Message source:", message.source);
-
                 // Ignore messages that originated from this UI
                 if (message.source === "ui") {
                     console.log("⏭️ Skipping own message");
+                    return;
+                }
+
+                // Don't update if user is currently dragging
+                if (isUserDragging.current) {
+                    console.log("🚫 User is dragging, skipping update");
                     return;
                 }
 
@@ -113,18 +127,17 @@ export default function RobotArmView() {
 
                     Object.entries(data).forEach(([k, v]) => {
                         if (k in next && typeof v === "number") {
-                            // Clamp to valid range
-                            const cfg = urdfJoints[k];
+                            const cfg = urdfJoints[k as keyof typeof urdfJoints];
                             if (cfg) {
                                 const clampedValue = Math.max(
                                     cfg.min,
                                     Math.min(cfg.max, v)
                                 );
-                                console.log(
-                                    `  ${k}: ${prev[k]} → ${clampedValue}`
-                                );
-                                next[k] = clampedValue;
-                                updated = true;
+                                if (Math.abs(next[k] - clampedValue) > 0.01) {
+                                    console.log(`  ${k}: ${prev[k]} → ${clampedValue}`);
+                                    next[k] = clampedValue;
+                                    updated = true;
+                                }
                             }
                         }
                     });
@@ -133,66 +146,121 @@ export default function RobotArmView() {
                         console.log("✅ Joints updated:", next);
                     }
 
-                    return next;
+                    return updated ? next : prev;
                 });
             } catch (err) {
                 console.error("❌ WS parse error", err);
             }
         };
 
-        ws.onerror = () => {
-            console.error("❌ WS error");
-            setWsConnected(false);
+        ws.onerror = (error) => {
+            console.error("❌ WS error", error);
+            if (isMounted.current) {
+                setWsConnected(false);
+            }
         };
 
         ws.onclose = () => {
             console.log("🔌 WS closed");
-            setWsConnected(false);
+            if (isMounted.current) {
+                setWsConnected(false);
+            }
         };
 
         return () => {
-            ws.close();
+            isMounted.current = false;
+            
+            // Clean up all timeouts
+            Object.values(sendTimeoutRef.current).forEach(clearTimeout);
+            sendTimeoutRef.current = {};
+            
+            // Clean up all RAFs
+            Object.values(rafRef.current).forEach(cancelAnimationFrame);
+            rafRef.current = {};
+            
+            // Close WebSocket
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                ws.close();
+            }
         };
     }, []);
 
-    /* ===================== Send Joint Update ===================== */
-    const updateJoint = (name: string, value: number) => {
-        // Don't block UI updates when user is interacting
+    /* ===================== Update Joint (Immediate UI + Throttled WS) ===================== */
+    const updateJointImmediate = (name: string, value: number) => {
+        if (!isMounted.current) return;
+        
         setAutoRotate(false);
 
-        const cfg = urdfJoints[name];
+        const cfg = urdfJoints[name as keyof typeof urdfJoints];
+        if (!cfg) return;
+        
         const deg = clamp(value, cfg.min, cfg.max);
 
-        setJoints((prev) => ({
-            ...prev,
-            [name]: deg,
-        }));
-
-        const payload = {
-            type: "joint_update",
-            urdfJoints: {
-                [name]: deg,
-            },
-            joints: {
-                [name]: deg,
-            },
-            source: "ui",
-            role: "robot", // Added for Python backend compatibility
-        };
-
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
+        // Cancel any pending RAF for this joint
+        if (rafRef.current[name]) {
+            cancelAnimationFrame(rafRef.current[name]);
         }
 
-        debounceRef.current = setTimeout(() => {
-            if (wsRef.current?.readyState === WebSocket.OPEN) {
-                console.log("📤 WS sending:", payload);
-                wsRef.current.send(JSON.stringify(payload));
-            } else {
-                console.log("⏳ WS not ready, queuing message");
-                pendingMessages.current.push(payload);
+        // Immediate UI update via RAF (60fps smooth)
+        rafRef.current[name] = requestAnimationFrame(() => {
+            if (!isMounted.current) return;
+            setJoints((prev) => ({
+                ...prev,
+                [name]: deg,
+            }));
+        });
+
+        // Throttled WebSocket send
+        if (sendTimeoutRef.current[name]) {
+            clearTimeout(sendTimeoutRef.current[name]);
+        }
+
+        sendTimeoutRef.current[name] = setTimeout(() => {
+            if (!isMounted.current) return;
+            
+            // Only send if value actually changed
+            if (Math.abs((lastSentValue.current[name] ?? 0) - deg) > 0.1) {
+                lastSentValue.current[name] = deg;
+                
+                const payload: JointUpdate = {
+                    type: "joint_update",
+                    urdfJoints: { [name]: deg },
+                    joints: { [name]: deg },
+                    source: "ui",
+                    role: "robot",
+                };
+
+                if (wsRef.current?.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify(payload));
+                } else {
+                    pendingMessages.current.push(payload);
+                }
             }
-        }, 40);
+            
+            // Clean up this timeout reference
+            delete sendTimeoutRef.current[name];
+        }, 16); // 16ms = ~60fps
+    };
+
+    /* ===================== Send All Joints (for button clicks) ===================== */
+    const sendAllJointsToWS = (allJoints: Record<string, number>) => {
+        if (!isMounted.current) return;
+        
+        const payload: JointUpdate = {
+            type: "joint_update",
+            urdfJoints: allJoints,
+            joints: allJoints,
+            source: "ui",
+            role: "robot",
+        };
+
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            console.log("📤 WS sending all joints:", payload);
+            wsRef.current.send(JSON.stringify(payload));
+        } else {
+            console.log("⏳ WS not ready, queuing message");
+            pendingMessages.current.push(payload);
+        }
     };
 
     /* ===================== Reset ===================== */
@@ -202,32 +270,20 @@ export default function RobotArmView() {
         );
 
         setJoints(reset);
-
-        const payload = {
-            type: "joint_update",
-            urdfJoints: reset,
-            joints: reset,
-            source: "ui",
-            role: "robot",
-        };
-
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-            console.log("📤 WS sending reset:", payload);
-            wsRef.current.send(JSON.stringify(payload));
-        }
+        sendAllJointsToWS(reset);
     };
 
     /* ===================== UI ===================== */
     return (
-        <div className="flex h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
+        <div className="flex h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200 no-scrollbar">
             {/* LEFT PANEL */}
-            <div className="w-[420px] border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex flex-col">
+            <div className="w-[420px] border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 flex flex-col no-scrollbar">
                 {/* Header */}
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800">
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                Robot Controller
+                                Arm Controller
                             </h1>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                 URDF Joint Control Panel
@@ -284,11 +340,12 @@ export default function RobotArmView() {
                     {Object.entries(urdfJoints).map(([name, cfg]) => (
                         <div
                             key={name}
-                            className="group bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 border border-gray-200 dark:border-gray-700 rounded-xl p-4 transition-all duration-200 shadow-sm dark:shadow-none"
+                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm transition-all duration-200 hover:shadow-md"
                         >
+                            {/* HEADER */}
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                                    <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
                                         <Rotate3D
                                             size={18}
                                             className="text-purple-600 dark:text-purple-400"
@@ -298,73 +355,89 @@ export default function RobotArmView() {
                                         <h3 className="font-medium text-gray-900 dark:text-white">
                                             {name}
                                         </h3>
-                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                            <span>Min: {cfg.min}°</span>
-                                            <span className="text-gray-300 dark:text-gray-600">
-                                                •
-                                            </span>
-                                            <span>Max: {cfg.max}°</span>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                            Min {cfg.min}° • Max {cfg.max}°
                                         </div>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                                        {joints[name].toFixed(1)}°
-                                    </div>
+
+                                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                                    {Math.round(joints[name] ?? 0)}°
                                 </div>
                             </div>
 
-                            {/* Slider */}
-                            <div className="space-y-3">
-                                <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
-                                    <span>{cfg.min}°</span>
-                                    <span className="text-purple-600 dark:text-purple-400">
-                                        Current Position
-                                    </span>
-                                    <span>{cfg.max}°</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min={cfg.min}
-                                    max={cfg.max}
-                                    step="0.1"
-                                    value={joints[name]}
-                                    onChange={(e) =>
-                                        updateJoint(name, +e.target.value)
-                                    }
-                                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-600 dark:[&::-webkit-slider-thumb]:bg-purple-400 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white dark:[&::-webkit-slider-thumb]:border-gray-800 [&::-webkit-slider-thumb]:shadow-md"
-                                />
-                            </div>
+                            {/* SLIDER */}
+                            <input
+                                type="range"
+                                min={cfg.min}
+                                max={cfg.max}
+                                step="1"
+                                value={joints[name] ?? 0}
+                                onInput={(e) => {
+                                    // Ultra-fast immediate update
+                                    const value = Number(e.currentTarget.value);
+                                    updateJointImmediate(name, value);
+                                }}
+                                onMouseDown={() => {
+                                    isUserDragging.current = true;
+                                }}
+                                onMouseUp={() => {
+                                    isUserDragging.current = false;
+                                }}
+                                onTouchStart={() => {
+                                    isUserDragging.current = true;
+                                }}
+                                onTouchEnd={() => {
+                                    isUserDragging.current = false;
+                                }}
+                                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer transition-all
+                                    [&::-webkit-slider-thumb]:appearance-none
+                                    [&::-webkit-slider-thumb]:h-5
+                                    [&::-webkit-slider-thumb]:w-5
+                                    [&::-webkit-slider-thumb]:rounded-full
+                                    [&::-webkit-slider-thumb]:bg-purple-600
+                                    [&::-webkit-slider-thumb]:dark:bg-purple-500
+                                    [&::-webkit-slider-thumb]:cursor-grab
+                                    [&::-webkit-slider-thumb]:active:cursor-grabbing
+                                    [&::-webkit-slider-thumb]:transition-transform
+                                    [&::-webkit-slider-thumb]:hover:scale-110
+                                    [&::-webkit-slider-thumb]:active:scale-105
+                                    [&::-webkit-slider-thumb]:shadow-lg
+                                    [&::-moz-range-thumb]:h-5
+                                    [&::-moz-range-thumb]:w-5
+                                    [&::-moz-range-thumb]:rounded-full
+                                    [&::-moz-range-thumb]:bg-purple-600
+                                    [&::-moz-range-thumb]:dark:bg-purple-500
+                                    [&::-moz-range-thumb]:border-0
+                                    [&::-moz-range-thumb]:cursor-grab
+                                    [&::-moz-range-thumb]:active:cursor-grabbing
+                                    [&::-moz-range-thumb]:transition-transform
+                                    [&::-moz-range-thumb]:hover:scale-110
+                                    [&::-moz-range-thumb]:active:scale-105"
+                            />
 
-                            {/* Control Buttons */}
+                            {/* BUTTONS */}
                             <div className="flex gap-2 mt-4">
                                 <button
-                                    onClick={() =>
-                                        updateJoint(name, joints[name] - 5)
-                                    }
-                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors group/btn"
+                                    onClick={() => {
+                                        const newValue = clamp(joints[name] - 5, cfg.min, cfg.max);
+                                        updateJointImmediate(name, newValue);
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors active:scale-95"
                                 >
-                                    <Minus
-                                        size={16}
-                                        className="text-gray-700 dark:text-gray-300 group-hover/btn:text-purple-600 dark:group-hover/btn:text-purple-400"
-                                    />
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        -5°
-                                    </span>
+                                    <Minus size={16} className="text-gray-700 dark:text-gray-300" />
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">-5°</span>
                                 </button>
+
                                 <button
-                                    onClick={() =>
-                                        updateJoint(name, joints[name] + 5)
-                                    }
-                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors group/btn"
+                                    onClick={() => {
+                                        const newValue = clamp(joints[name] + 5, cfg.min, cfg.max);
+                                        updateJointImmediate(name, newValue);
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors active:scale-95"
                                 >
-                                    <Plus
-                                        size={16}
-                                        className="text-gray-700 dark:text-gray-300 group-hover/btn:text-purple-600 dark:group-hover/btn:text-purple-400"
-                                    />
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        +5°
-                                    </span>
+                                    <Plus size={16} className="text-gray-700 dark:text-gray-300" />
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">+5°</span>
                                 </button>
                             </div>
                         </div>
@@ -383,7 +456,7 @@ export default function RobotArmView() {
                                 className="text-purple-600 dark:text-purple-400 group-hover:rotate-180 transition-transform duration-500"
                             />
                             <span className="font-medium text-purple-600 dark:text-purple-400">
-                                Reset All Joints
+                                Reset All
                             </span>
                         </button>
                         <button
@@ -392,28 +465,21 @@ export default function RobotArmView() {
                         >
                             <Home
                                 size={18}
-                                className="text-gray-700 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400"
+                                className="text-gray-700 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
                             />
                             <span className="font-medium text-gray-700 dark:text-gray-300">
                                 Reset View
                             </span>
-                            <div
-                                className={`w-2 h-2 rounded-full ${
-                                    resetView
-                                        ? "bg-purple-600 dark:bg-purple-400"
-                                        : "bg-gray-400 dark:bg-gray-600"
-                                } group-hover:bg-purple-600 dark:group-hover:bg-purple-400`}
-                            />
                         </button>
                     </div>
                 </div>
             </div>
 
             {/* 3D VIEW */}
-            <div className="flex-1 relative bg-white dark:bg-gray-900">
+            <div className="flex-1 relative bg-white dark:bg-gray-900 no-scrollbar">
                 {/* Overlay Controls */}
                 <div className="absolute top-6 right-6 z-10">
-                    <div className="flex items-center gap-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 shadow-md dark:shadow-lg dark:shadow-black/20">
+                    <div className="flex items-center gap-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg p-2 shadow-md">
                         <div className="flex items-center gap-2 px-3 py-1.5">
                             <div
                                 className={`w-2 h-2 rounded-full ${
@@ -437,29 +503,27 @@ export default function RobotArmView() {
                     </div>
                 </div>
 
-                {/* Canvas - Remove the gradient className */}
+                {/* Canvas */}
                 <Canvas
                     key={resetView ? "reset" : "normal"}
                     camera={{ position: [2, 2, 4], fov: 15 }}
                 >
-                    {/* Set background color based on theme */}
                     <color
                         attach="background"
-                        args={[isDark ? "#0f172a" : "#ffffff"]} // gray-900 for dark, white for light
+                        args={[isDark ? "#111827" : "#ffffff"]}
                     />
 
-                    {/* Adjust lighting based on theme */}
                     <ambientLight intensity={isDark ? 0.6 : 0.7} />
                     <directionalLight
                         position={[5, 5, 5]}
                         intensity={isDark ? 0.9 : 1.2}
                         castShadow
                         shadow-mapSize={[2048, 2048]}
-                        color={isDark ? "#cbd5e1" : "#ffffff"} // Adjust light color for dark mode
+                        color={isDark ? "#cbd5e1" : "#ffffff"}
                     />
                     <hemisphereLight
-                        intensity={isDark ? 0.3 : 0.3}
-                        groundColor={isDark ? "#1e293b" : "#f1f5f9"} // sky-900 for dark, sky-50 for light
+                        intensity={0.3}
+                        groundColor={isDark ? "#1e293b" : "#f1f5f9"}
                     />
 
                     <URDFRobot joints={joints} />
@@ -473,22 +537,17 @@ export default function RobotArmView() {
                         maxDistance={20}
                     />
 
-                    {/* Adjust grid helper colors for dark mode */}
                     <gridHelper
                         args={[
                             10,
                             10,
-                            isDark ? "#334155" : "#cbd5e1", // grid color
-                            isDark ? "#1e293b" : "#e2e8f0", // center line color
+                            isDark ? "#334155" : "#cbd5e1",
+                            isDark ? "#1e293b" : "#e2e8f0",
                         ]}
                         position={[0, -0.5, 0]}
                     />
 
-                    {/* Optional: Make axes more visible in dark mode */}
-                    <axesHelper
-                        args={[2]}
-                        material-color={isDark ? "#cbd5e1" : "#64748b"} // gray-300 for dark, gray-500 for light
-                    />
+                    <axesHelper args={[2]} />
                 </Canvas>
             </div>
         </div>
