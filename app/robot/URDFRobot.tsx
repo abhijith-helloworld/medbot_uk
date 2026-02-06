@@ -6,18 +6,20 @@ import URDFLoader from "urdf-loader";
 
 interface URDFRobotProps {
   joints: Record<string, number>;
+  onRobotLoaded?: () => void;
+  onError?: (error: Error) => void;
 }
 
 interface URDFJoint {
-  jointType: "revolute" | "prismatic" | "fixed" | "continuous";
+  jointType: "revolute" | "prismatic" | "fixed" | "continuous" | "planar" | "floating";
   setJointValue: (value: number) => void;
 }
 
 interface URDFRobotType extends THREE.Object3D {
-  joints: Record<string, URDFJoint>;
+  joints: { [key: string]: URDFJoint };
 }
 
-export default function URDFRobot({ joints }: URDFRobotProps) {
+export default function URDFRobot({ joints, onRobotLoaded, onError }: URDFRobotProps) {
   const groupRef = useRef<THREE.Group>(null);
   const robotRef = useRef<URDFRobotType | null>(null);
   const isMounted = useRef(true);
@@ -73,10 +75,14 @@ export default function URDFRobot({ joints }: URDFRobotProps) {
           
           groupRef.current.add(robot);
         }
+
+        // Notify parent that robot is loaded
+        onRobotLoaded?.();
       },
       undefined,
       (error) => {
         console.error("Error loading URDF:", error);
+        onError?.(error instanceof Error ? error : new Error(String(error)));
       }
     );
 
@@ -106,13 +112,31 @@ export default function URDFRobot({ joints }: URDFRobotProps) {
       
       robotRef.current = null;
     };
-  }, []);
+  }, [onRobotLoaded, onError]);
 
   /* ===================== UPDATE JOINTS ===================== */
   useEffect(() => {
     if (!robotRef.current || !isMounted.current) return;
 
     Object.entries(joints).forEach(([name, value]) => {
+      // Handle gripper as single input controlling both joint7 and joint8
+      if (name === "gripper") {
+        const joint7 = robotRef.current?.joints["joint7"];
+        const joint8 = robotRef.current?.joints["joint8"];
+        
+        if (joint7 && joint8) {
+          try {
+            // Convert mm to meters
+            const meterValue = value / 1000;
+            joint7.setJointValue(meterValue);        // joint7: 0 to 0.035m
+            joint8.setJointValue(-meterValue);       // joint8: 0 to -0.035m (mirrored)
+          } catch (error) {
+            console.error("Error setting gripper joints:", error);
+          }
+        }
+        return;
+      }
+
       const joint = robotRef.current?.joints[name];
       if (!joint) return;
 
