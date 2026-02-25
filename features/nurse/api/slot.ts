@@ -54,13 +54,13 @@ export const createSlot = async (payload: CreateSlotPayload): Promise<ApiRespons
 
 
 export const getAllSlots = async (): Promise<ApiResponse<Slot[]> & { count: number }> => {
-  const { data } = await api.get(`bed/data/slot/all/`);
+  const { data } = await api.get(`bed/data/slot/not_booked/`);
   return data;
 };
 
 
 export const toggleSlotStatus = async (id: number): Promise<ApiResponse<null>> => {
-  const { data } = await api.delete(`bed/data/slot/delete/${id}/`);
+  const { data } = await api.delete(`bed/data/slot/deactivate/${id}/`);
   return data;
 };
 

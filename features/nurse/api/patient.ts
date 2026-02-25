@@ -94,7 +94,7 @@ export async function createPatient(payload: CreatePatientDto) {
 }
 
 export async function deletePatient(id: number) {
-  const { data } = await api.delete(`/main/delete-patient/${id}/`);
+  const { data } = await api.delete(`/main/deactivate-patient/${id}/`);
   return data;
 }
 

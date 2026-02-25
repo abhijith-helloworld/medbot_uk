@@ -35,10 +35,15 @@ export const getAllVideos = async (): Promise<ApiListResponse<Video>> => {
   return data;
 };
 
+
 export const createVideo = async (
   payload: FormData
 ): Promise<ApiItemResponse<Video>> => {
-  const { data } = await api.post(`video_management/add-video/`, payload);
+  const { data } = await api.post(`video_management/add-video/`, payload, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return data;
 };
 

@@ -62,19 +62,6 @@ const formatDate = (dateString: string) => {
     });
 };
 
-// Helper to generate the next patient ID
-const generateNextPatientId = (patients: Patient[] | undefined): string => {
-    if (!patients || patients.length === 0) {
-        return "PAT-001";
-    }
-    const maxId = patients.reduce((max, p) => {
-        const numericPart = parseInt(p.patient_id.replace(/[^0-9]/g, ""), 10);
-        return !isNaN(numericPart) && numericPart > max ? numericPart : max;
-    }, 0);
-
-    return `PAT-${String(maxId + 1).padStart(3, "0")}`;
-};
-
 const initialFormState = {
     name: "",
     age: "",
@@ -83,6 +70,11 @@ const initialFormState = {
 };
 
 export function PatientManagement() {
+    // NEW: Add state for active filter
+    const [activeFilter, setActiveFilter] = useState<"active" | "inactive">(
+        "active",
+    );
+
     const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } =
         usePatients();
 
@@ -91,8 +83,18 @@ export function PatientManagement() {
         () =>
             data?.pages.flatMap((page) => page.results.data).filter(Boolean) ??
             [],
-        [data]
+        [data],
     );
+
+    // NEW: Filter patients based on activeFilter
+    const filteredPatients = useMemo(() => {
+        if (activeFilter === "all") return allPatients;
+        if (activeFilter === "active")
+            return allPatients.filter((p) => p.is_active === true);
+        if (activeFilter === "inactive")
+            return allPatients.filter((p) => p.is_active === false);
+        return allPatients;
+    }, [allPatients, activeFilter]);
 
     const createOrUpdatePatient = useCreatePatient();
     const togglePatientStatus = useDeletePatient();
@@ -102,7 +104,7 @@ export function PatientManagement() {
     const [isSlotDialogOpen, setIsSlotDialogOpen] = useState(false);
     const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(
-        null
+        null,
     );
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [formData, setFormData] = useState(initialFormState);
@@ -121,7 +123,7 @@ export function PatientManagement() {
                 fetchNextPage();
             }
         },
-        [hasNextPage, isFetchingNextPage, fetchNextPage]
+        [hasNextPage, isFetchingNextPage, fetchNextPage],
     );
 
     // Set up intersection observer
@@ -164,7 +166,19 @@ export function PatientManagement() {
 
     const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        setFormData((prev) => ({ ...prev, [id]: value }));
+
+        // Format Patient ID as PAT-XXX
+        if (id === "patient_id") {
+            // Remove any existing prefix and non-numeric characters
+            const numericOnly = value.replace(/[^0-9]/g, "");
+
+            // Format with PAT- prefix if there are numbers
+            const formattedValue = numericOnly ? `PAT-${numericOnly}` : "";
+
+            setFormData((prev) => ({ ...prev, [id]: formattedValue }));
+        } else {
+            setFormData((prev) => ({ ...prev, [id]: value }));
+        }
     };
 
     const handleGenderChange = (value: string) => {
@@ -172,7 +186,7 @@ export function PatientManagement() {
     };
 
     const handleSubmit = () => {
-        if (!formData.name || !formData.age) {
+        if (!formData.name || !formData.age || !formData.patient_id) {
             toast.warning("Please fill in all required fields.");
             return;
         }
@@ -191,12 +205,8 @@ export function PatientManagement() {
     };
 
     const handleAddNewClick = () => {
-        const nextId = generateNextPatientId(allPatients);
         setEditingPatient(null);
-        setFormData({
-            ...initialFormState,
-            patient_id: nextId,
-        });
+        setFormData(initialFormState);
         setIsDialogOpen(true);
     };
 
@@ -220,7 +230,7 @@ export function PatientManagement() {
             { patientId: selectedPatient.id, slotId: selectedSlot },
             {
                 onSuccess: () => setIsSlotDialogOpen(false),
-            }
+            },
         );
     };
 
@@ -268,6 +278,43 @@ export function PatientManagement() {
                 </div>
             </div>
 
+            {/* NEW: Filter Tabs */}
+            <div className="flex gap-2">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    data-active={activeFilter === "active"}
+                    onClick={() => setActiveFilter("active")}
+                    className="
+            font-medium transition-all
+            data-[active=true]:bg-purple-600
+            data-[active=true]:text-white
+            data-[active=true]:hover:bg-purple-700
+            bg-purple-100 text-purple-700 hover:bg-purple-200
+        "
+                >
+                    <Power className="w-4 h-4 mr-1" />
+                    Active
+                </Button>
+
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    data-active={activeFilter === "inactive"}
+                    onClick={() => setActiveFilter("inactive")}
+                    className="
+            font-medium transition-all
+            data-[active=true]:bg-red-600
+            data-[active=true]:text-white
+            data-[active=true]:hover:bg-red-700
+            bg-red-100 text-red-700 hover:bg-red-200
+        "
+                >
+                    <PowerOff className="w-4 h-4 mr-1" />
+                    Inactive
+                </Button>
+            </div>
+
             {/* Add/Edit Patient Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="max-w-[95vw] sm:max-w-[425px] mx-auto">
@@ -287,13 +334,15 @@ export function PatientManagement() {
                                 htmlFor="patient_id"
                                 className="sm:text-right text-sm sm:text-base"
                             >
-                                Patient ID
+                                Patient ID *
                             </Label>
                             <Input
                                 id="patient_id"
                                 value={formData.patient_id}
+                                onChange={handleFormChange}
+                                placeholder="Enter numbers (e.g., 001)"
                                 className="sm:col-span-3 text-sm sm:text-base"
-                                disabled
+                                disabled={isEditMode}
                             />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-2 sm:gap-4">
@@ -375,8 +424,8 @@ export function PatientManagement() {
                                     ? "Saving..."
                                     : "Adding..."
                                 : isEditMode
-                                ? "Save Changes"
-                                : "Add Patient"}
+                                  ? "Save Changes"
+                                  : "Add Patient"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -434,9 +483,9 @@ export function PatientManagement() {
                 </DialogContent>
             </Dialog>
 
-            {/* Patient List */}
+            {/* Patient List - NOW USES filteredPatients */}
             <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {allPatients.map((patient) => (
+                {filteredPatients.map((patient) => (
                     <Card
                         key={patient.id}
                         className="flex flex-col justify-between hover:shadow-md transition-shadow duration-200"
@@ -530,14 +579,29 @@ export function PatientManagement() {
                                     togglePatientStatus.variables === patient.id
                                         ? "..."
                                         : patient.is_active
-                                        ? "Deactivate"
-                                        : "Activate"}
+                                          ? "Deactivate"
+                                          : "Activate"}
                                 </Button>
                             </div>
                         </CardFooter>
                     </Card>
                 ))}
             </div>
+
+            {/* Empty state when filter returns no results */}
+            {filteredPatients.length === 0 && !isLoading && (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <p className="text-muted-foreground text-lg">
+                        No{" "}
+                        {activeFilter === "active"
+                            ? "active"
+                            : activeFilter === "inactive"
+                              ? "inactive"
+                              : ""}{" "}
+                        patients found
+                    </p>
+                </div>
+            )}
 
             {/* Intersection Observer Target & Loading Indicator */}
             {hasNextPage && (

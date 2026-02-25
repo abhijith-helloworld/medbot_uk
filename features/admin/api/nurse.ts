@@ -49,6 +49,6 @@ export async function fetchNurses() {
 // TOGGLE nurse activation status
 export async function toggleNurseStatus(id: number) {
   // This endpoint toggles the is_active status
-  const { data } = await api.delete(`/main/delete-admin/${id}/`);
+  const { data } = await api.delete(`/main/deactivate-admin/${id}/`);
   return data;
 }
